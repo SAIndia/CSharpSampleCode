@@ -1,0 +1,242 @@
+﻿@model BallardChalmers.ServiceInterface.Dto.DiaryViewDto
+@{BallardChalmers.ServiceInterface.IBookingService bookingService = new BallardChalmers.Service.BookingServiceClient();}
+<input type="hidden" id="hidResponseValueRoom" value="@Model.ResponseValue" />
+@if (!string.IsNullOrEmpty(Model.ExceptionMessage))
+{
+    @:<script type="text/javascript">$.showMessageAlert(['@Html.Raw(Model.ExceptionMessage)']);</script>
+    }
+@if (Model.ResponseValue == 1)
+{
+    @:<script type="text/javascript">gotoTillScreen([@(String.Join(",", Model.TransactionIds))],@Model.ReservationID);</script>
+    }
+@if (Model.ResponseValue == 2)
+{
+    @:<script type="text/javascript">showBookingReport(@Model.ReservationID)</script>
+}
+@{
+    string customerName = string.Empty;
+}
+@if (Model.RoomList.Count == 0)
+{
+    <script type="text/javascript">
+        if ($("#lnkRoom").hasClass("active")) {
+            $('div.booking-details').hide();
+        }
+    </script>
+}
+else
+{ 
+    <script type="text/javascript">
+        if ($("#lnkRoom").hasClass("active")) {
+            $('div.booking-details').show()
+        }
+    </script>
+}
+
+<div class="booking-details-bottom" id="dvBookingDetailsRoom">
+    <div class="staff-details-table">
+        <table cellpadding="0" cellspacing="0" border="0" width="100%" class="stickyHeader" id="tblRoom">
+            <thead>
+                <tr>
+                    <th valign="top" width="42" class="no-border-color">&nbsp;</th>
+                    @foreach (BallardChalmers.ServiceInterface.Dto.RoomDto roomDto in Model.RoomList)
+                    {
+                        <th valign="top" width="80">
+                            <a href="javascript:void(0);" data-modal="true" onclick="GetRoomProductHouseDetails(@roomDto.RoomID, '@roomDto.RoomName' );"  >@roomDto.RoomName</a>
+                        </th>
+                    }
+                </tr>
+            </thead>
+            @{
+                int startingHour = 6, noOfTimeSlots = 205;
+                List<string> TimeCollection = Enumerable.Range(0, noOfTimeSlots).Select(i => DateTime.Today.AddHours(startingHour).AddMinutes(i * 5).ToString("HH:mm")).ToList();
+                string cssClass = "";
+                int timeSlotCount = 1;
+                int bookingCount = 0;
+            }
+            @foreach (String time in TimeCollection)
+            {
+                int StartHour, StartMinute;
+                int reminder = timeSlotCount % 12;
+                /*if (reminder == 1) { cssClass = "class=dark-border"; }
+                else if (reminder == 2 || reminder == 0) { cssClass = "class=light-border"; }
+                else { cssClass = ""; }*/
+                if (reminder == 1) { cssClass = "class=dark-border"; }
+                else if (reminder == 7) { cssClass = ""; }
+                else { cssClass = "class=light-border"; }
+
+                string[] timeParts = time.Split(':');
+                StartHour = Convert.ToInt32(timeParts[0]);
+                StartMinute = Convert.ToInt32(timeParts[1]);
+
+                DateTime bookingDate = Model.ActivityDate.Date;
+                TimeSpan timeSpan = new TimeSpan(0, StartHour, StartMinute, 0);
+                DateTime currentDateTime = bookingDate.Date.Add(timeSpan);
+                string bookingBoxClass = string.Empty;
+                            
+                <tr @cssClass>
+                    <td valign="top" width="42" class="no-border-color">@currentDateTime.ToString("hh:mm")</td>
+                    @foreach (BallardChalmers.ServiceInterface.Dto.RoomDto roomDto in Model.RoomList)
+                    {
+                        customerName = string.Empty;
+                        BallardChalmers.ServiceInterface.Dto.DairyViewItemDto bookingDto = Model.BookingList.FirstOrDefault(x => x.RoomId == roomDto.RoomID && x.StartTime.Equals(time));
+                        if (bookingDto != null)
+                        {
+                            bookingCount++;
+                            bookingBoxClass = "jqBookingContainer" + bookingCount.ToString();
+                            
+                        <td valign="top" rowspan='@bookingDto.RowSpan'>
+                            <div class='@bookingDto.BookingStatusColor @bookingBoxClass' data-customerid="@bookingDto.CustomerID" style="height:@bookingDto.Height; cursor:pointer;" onclick="displayForMoveRoom(@bookingDto.ActivityId,@bookingDto.BookingId,@bookingDto.RotaId,'@bookingBoxClass');">
+                                <span class="jqIndicatorBox">&nbsp;
+                                @if (roomDto.DualRoom.HasValue && roomDto.DualRoom.Value)
+                                {
+                                    if (!bookingDto.RoomAvailable)
+                                    {
+                                    <a href="javascript:void(0);" class="plus-icon">&nbsp;</a>
+                                    }
+                                }
+                                    @if (!string.IsNullOrEmpty(bookingDto.NoteText))
+                                    {
+                                        <a href="javascript:void(0);" class="note-icon">&nbsp;</a>
+                                    }
+                                </span>
+                                <strong>@bookingDto.CustomerName
+                                    <br />
+                                </strong>
+                                @if (@bookingDto.RowSpan > 2)
+                                {
+                                    <strong>@bookingDto.CustomerSurName
+                                        <br />
+                                    </strong>
+                                
+                                }
+                                @if (roomDto.DualRoom.GetValueOrDefault())
+                                {
+                                    if (@bookingDto.RowSpan > 3)
+                                    {
+                                    @bookingDto.Activity
+                                
+                                    }
+                                }
+                                else
+                                {
+                                    if (@bookingDto.RowSpan > 3)
+                                    {
+                                    @bookingDto.Activity
+                                
+                                    }
+                                }
+                                @if (roomDto.DualRoom.GetValueOrDefault())
+                                {
+                                    if (@bookingDto.RowSpan > 4)
+                                    {
+                                    @bookingDto.StaffName
+                                    }
+                                }
+                                else
+                                {
+                                    if (@bookingDto.RowSpan > 4)
+                                    {
+                                    @bookingDto.StaffName
+                                    }
+                                }
+                            </div>
+                        </td>
+                        }
+                        else
+                        {
+                            BallardChalmers.ServiceInterface.Dto.RoomRotaDto roomRotaDto = roomDto.RoomRotas.FirstOrDefault(x => x.Date.Value.Year == Model.ActivityDate.Year && x.Date.Value.Month == Model.ActivityDate.Month && x.Date.Value.Day == Model.ActivityDate.Day);
+                            //if (roomRotaDto != null && roomDto.HasNonInternalAppointments)
+                            if (roomRotaDto != null && roomDto.HasNonInternalAppointments)
+                            {
+                                DateTime rotaEndDateTime = roomRotaDto.EndTime.Value;
+                                TimeSpan endTimeSpan = new TimeSpan(0, StartHour, StartMinute, 0);
+                                DateTime currentDateTimeSlot = rotaEndDateTime.Date.Add(endTimeSpan);
+                                DateTime rotaStartDateTime = roomRotaDto.StartTime.Value;
+
+                                if (@currentDateTimeSlot.CompareTo(rotaEndDateTime) >= 0 || @currentDateTimeSlot.CompareTo(rotaStartDateTime) < 0)
+                                {
+                        <td valign="top" class="no-work-colour"></td>
+                    
+                                }
+                                else
+                                {
+                                    bool staffAvailable = true;
+                                    if (Model.RequiresStaff)
+                                    {
+                                        if (Model.StaffList != null)
+                                        {
+                                            staffAvailable = false;
+                                            if (Model.StaffList.Count > 0)
+                                            {
+                                                foreach (BallardChalmers.ServiceInterface.Dto.StaffDto staffDto in Model.StaffList)
+                                                {
+                                                    BallardChalmers.ServiceInterface.Dto.DairyViewItemDto bookingDtoStaff = Model.BookingList.FirstOrDefault(x => x.StaffId == staffDto.StaffID && x.StartDate <= currentDateTime && x.EndDate > currentDateTime);
+
+                                                    if (bookingDtoStaff != null)
+                                                    {
+                                                        staffAvailable = false;
+
+                                                    }
+                                                    else
+                                                    {
+                                                        BallardChalmers.ServiceInterface.Dto.StaffRotaDto staffRotaDto = roomDto.StaffRotas.FirstOrDefault(x => x.Date.Value.Year == Model.ActivityDate.Year && x.Date.Value.Month == Model.ActivityDate.Month && x.Date.Value.Day == Model.ActivityDate.Day);
+                                                        if (staffRotaDto != null)
+                                                        {
+                                                            DateTime staffRotaEndDateTime = staffRotaDto.EndTime.Value;
+                                                            DateTime staffRotaStartDateTime = staffRotaDto.StartTime.Value;
+
+                                                            if (@currentDateTimeSlot.CompareTo(staffRotaEndDateTime) >= 0 || @currentDateTimeSlot.CompareTo(staffRotaStartDateTime) < 0)
+                                                            {
+                                                                staffAvailable = false;
+
+                                                            }
+                                                            else
+                                                            {
+                                                                staffAvailable = true;
+                                                                break;
+                                                            }
+
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    if (staffAvailable)
+                                    {
+                                        BallardChalmers.ServiceInterface.Dto.RotaDto currentRotaDto = roomDto.Rotas.FirstOrDefault(x => x.StartTime <= currentDateTimeSlot.TimeOfDay && x.EndTime >= currentDateTimeSlot.TimeOfDay);
+                                        if (currentRotaDto != null)
+                                        {
+                                            staffAvailable = (currentRotaDto.ActivityId != @Model.ActivityId && @Model.ActivityId != 0) ? false : true;
+                                        }
+                                    }
+
+
+
+                                    if (staffAvailable)
+                                    {
+                        <td valign="top" class="no-booking" onclick="showRoomAbility('@time',@roomDto.RoomID);">&nbsp;</td>
+                                    }
+                                    else
+                                    {
+                        <td valign="top" class="no-work-colour"></td>
+                                    }
+                                }
+                            }
+                            else
+                            {
+                        <td valign="top" class="no-work-colour"></td>
+                            }
+                        }
+
+                    }
+                </tr>
+    
+                    timeSlotCount++;
+            }
+
+        </table>
+    </div>
+
+</div>

@@ -1,0 +1,258 @@
+﻿@model BallardChalmers.ServiceInterface.Dto.DiaryViewDto
+@using BallardChalmers.WebUI.Infrastructure.HtmlHelpers;
+<input type="hidden" id="hidResponseValue" value="@Model.ResponseValue" />
+<input type="hidden" value="@Model.ExceptionMessage" id="errorMsg"/>
+@if (!string.IsNullOrEmpty(Model.ExceptionMessage))
+{
+    
+   
+    @:<script type="text/javascript">$.showMessageAlert(['@Html.Raw(Model.ExceptionMessage)']);</script>
+    
+    //$.showMessageAlert('@Html.Raw(Model.ExceptionMessage)');
+    }
+
+@if (Model.ResponseValue == 1)
+{
+    @:<script type="text/javascript">gotoTillScreen([@(String.Join(",", Model.TransactionIds))],@Model.ReservationID);</script>
+    }
+@if (Model.ResponseValue == 2)
+{    
+    @:<script type="text/javascript">showBookingReport(@Model.ReservationID)</script>
+}
+
+<br />
+@{
+    string customerName = string.Empty;
+}
+@if (Model.StaffList.Count == 0)
+{
+    <script type="text/javascript"> 
+        if ($("#lnkStaff").hasClass("active")) {
+            $('div.booking-details').hide();
+        }
+    </script>
+}
+else
+{ 
+    <script type="text/javascript">
+        if ($("#lnkStaff").hasClass("active")) {
+            $('div.booking-details').show();
+        }
+    </script>
+}
+
+<div class="booking-details-bottom" id="dvBookingDetailsStaff">
+    <div class="staff-details-table">
+        <table cellpadding="0" cellspacing="0" border="0" width="100%" class="stickyHeader" id="tblStaff">
+            <thead>
+                <tr>
+                    <th valign="top" width="30" class="no-border-color">&nbsp;</th>
+
+                    @foreach (BallardChalmers.ServiceInterface.Dto.StaffDto staffDto in Model.StaffList)
+                    {
+                        <th valign="top" width="80">
+                            @{var fullname = @staffDto.Forename + " " + @staffDto.Surname;}
+                            <a data-modal="true" onclick="GetProductHouseDetails(@staffDto.StaffID, '@fullname' );"  href="#">@staffDto.Forename<br />@staffDto.Surname</a>
+                        </th>
+                    }
+
+
+                </tr>
+            </thead>
+            @{
+                //int startingHour = 8, noOfTimeSlots = 57;
+                int startingHour = 6, noOfTimeSlots = 205;
+                List<string>
+            TimeCollection = Enumerable.Range(0, noOfTimeSlots).Select(i => DateTime.Today.AddHours(startingHour).AddMinutes(i * 5).ToString("HH:mm")).ToList();
+                string cssClass = "";
+                int timeSlotCount = 1;
+                int bookingCount = 0; 
+            }
+
+            @foreach (String time in TimeCollection)
+            {
+                int StartHour, StartMinute;
+                int reminder = timeSlotCount % 12;
+                if (reminder == 1) { cssClass = "class=dark-border"; }
+                else if (reminder == 7) { cssClass = ""; }
+                else { cssClass = "class=light-border"; }
+
+                string[] timeParts = time.Split(':');
+                StartHour = Convert.ToInt32(timeParts[0]);
+                StartMinute = Convert.ToInt32(timeParts[1]);
+
+                DateTime bookingDate = Model.ActivityDate.Date;
+                TimeSpan timeSpan = new TimeSpan(0, StartHour, StartMinute, 0);
+                DateTime currentDateTime = bookingDate.Date.Add(timeSpan);
+                string bookingBoxClass = string.Empty;
+                <tr @cssClass>
+                    <td valign="top" width="42" class="no-border-color">@currentDateTime.ToString("hh:mm")</td>
+                    @foreach (BallardChalmers.ServiceInterface.Dto.StaffDto staffDto in Model.StaffList)
+                    {
+                        customerName = string.Empty;
+                        BallardChalmers.ServiceInterface.Dto.DairyViewItemDto bookingDto = Model.BookingList.FirstOrDefault(x => x.StaffId == staffDto.StaffID && x.StartTime.Equals(time));
+                        if (bookingDto != null)
+                        {
+                            bookingCount++;
+                            bookingBoxClass = "jqBookingContainer" + bookingCount.ToString();
+                        <td valign="top" rowspan='@bookingDto.RowSpan'>
+                            <div class='@bookingDto.BookingStatusColor @bookingBoxClass' data-roomavailable="@bookingDto.RoomAvailable" data-customerid="@bookingDto.CustomerID" style="height:@bookingDto.Height; cursor:pointer;" onclick="displayForMove(@bookingDto.ActivityId,@bookingDto.BookingId, @bookingDto.RotaId, '@bookingBoxClass');">
+                               <span class="jqIndicatorBox">&nbsp;
+                                @if (@bookingDto.IsDualRoom)
+                                {
+                                    if (!bookingDto.RoomAvailable)
+                                    {
+                                        <a href="javascript:void(0);" class="plus-icon">&nbsp;</a>
+                                    }
+                                }
+                                @if (!string.IsNullOrEmpty(bookingDto.NoteText))
+                                {
+                                    <a href="javascript:void(0);" class="note-icon">&nbsp;</a>
+                                }
+                               </span>
+                                <strong>@bookingDto.CustomerName
+                                </strong>
+
+                                @if (@bookingDto.RowSpan > 2)
+                                {
+                                    <strong>@bookingDto.CustomerSurName<br />
+                                    </strong>
+                                }
+                                @if (@bookingDto.RowSpan > 4)
+                                {
+                                    @bookingDto.Activity<br />
+                                }
+                                @if (@bookingDto.RowSpan > 6)
+                                {
+                                    @bookingDto.RoomNumber
+                                }
+
+                            </div>
+                        </td>
+                        }
+                        else
+                        {
+                            BallardChalmers.ServiceInterface.Dto.StaffRotaDto st = staffDto.StaffRotas.FirstOrDefault(x => x.Date.Value.Year == Model.ActivityDate.Year && x.Date.Value.Month == Model.ActivityDate.Month && x.Date.Value.Day == Model.ActivityDate.Day);
+                            //if (st != null && staffDto.HasNonInternalAppointments)
+                            if (st != null)
+                            {
+                                DateTime rotaEndDateTime = st.EndTime.Value;
+                                TimeSpan endTimeSpan = new TimeSpan(0, StartHour, StartMinute, 0);
+                                DateTime currentDateTimeSlot = rotaEndDateTime.Date.Add(endTimeSpan);
+                                DateTime rotaStartDateTime = st.StartTime.Value;
+
+                                if (@currentDateTimeSlot.CompareTo(rotaEndDateTime) >= 0 || @currentDateTimeSlot.CompareTo(rotaStartDateTime) < 0)
+                                {
+                        <td valign="top" class="no-work-colour">&nbsp;</td>
+                    
+                                }
+                                else
+                                {
+                                    bool roomAvailable = true;
+                                    if (Model.RequiresRoom)
+                                    {
+                                        roomAvailable = false;
+                                        if (Model.RoomList != null)
+                                        {
+
+                                            if (Model.RoomList.Count > 0)
+                                            {
+                                                foreach (BallardChalmers.ServiceInterface.Dto.RoomDto roomDto in Model.RoomList)
+                                                {
+                                                    BallardChalmers.ServiceInterface.Dto.DairyViewItemDto bookingDtoRoom = Model.BookingList.FirstOrDefault(x => x.RoomId == roomDto.RoomID && x.StartDate <= currentDateTime && x.EndDate > currentDateTime);
+
+                                                    if (bookingDtoRoom != null)
+                                                    {
+                                                        roomAvailable = false;
+
+                                                    }
+                                                    else
+                                                    {
+                                                        BallardChalmers.ServiceInterface.Dto.RoomRotaDto roomRotaDto = staffDto.RoomRotas.FirstOrDefault(x => x.Date.Value.Year == Model.ActivityDate.Year && x.Date.Value.Month == Model.ActivityDate.Month && x.Date.Value.Day == Model.ActivityDate.Day);
+                                                        if (roomRotaDto != null)
+                                                        {
+                                                            DateTime roomRotaEndDateTime = roomRotaDto.EndTime.Value;
+                                                            DateTime roomRotaStartDateTime = roomRotaDto.StartTime.Value;
+
+                                                            if (@currentDateTimeSlot.CompareTo(roomRotaEndDateTime) >= 0 || @currentDateTimeSlot.CompareTo(roomRotaStartDateTime) < 0)
+                                                            {
+                                                                roomAvailable = false;
+                                                            }
+                                                            else
+                                                            {
+                                                                roomAvailable = true;
+                                                                break;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    if (roomAvailable) { BallardChalmers.ServiceInterface.Dto.RotaDto currentRotaDto = staffDto.Rotas.FirstOrDefault(x => x.StartTime <= currentDateTimeSlot.TimeOfDay && x.EndTime >= currentDateTimeSlot.TimeOfDay); if (currentRotaDto != null) { roomAvailable = (currentRotaDto.ActivityId != @Model.ActivityId && @Model.ActivityId != 0) ? false : true; } }
+                                    if (roomAvailable)
+                                    {
+                        <td valign="top" class="no-booking" onclick="showStaffAbility('@time',@staffDto.StaffID);">&nbsp;</td>
+                                    }
+                                    else
+                                    {
+                        <td valign="top" class="no-work-colour">&nbsp;</td>
+                                    }
+                                }
+                            }
+                            else
+                            {
+                        <td valign="top" class="no-work-colour">&nbsp;</td>
+                            }
+                        }
+
+                    }
+                </tr>
+    
+                    timeSlotCount++;
+            }
+
+
+        </table>
+    </div>
+    <input type="hidden" id="hidReservationID" value="@Model.ReservationID"/>
+    <input type="hidden" id="hidMessage" value="@Model.ExceptionMessage"/>
+</div>
+
+<div id="addNote" class="booking-de-allocation-popup" style="display: none">
+    <div class="popup-hdr">
+        <div class="popup-hdr-left">
+            <h1>Add Note</h1>
+        </div>
+        <div class="popup-close">
+            <a href="#">
+                <img alt=" " src='@Url.Content("~/images/close-img.gif")'>
+            </a>
+        </div>
+    </div>
+    <div class="popup-content">
+        <div class="abilities-filter">
+            <label>Add Note Here</label><br />
+
+
+
+
+            <textarea id="txtNote" rows="5" style="width: 517px;"></textarea>
+
+            <div class="popup-btn">
+                <input class="cancel-btn" type="submit" value="Cancel">
+                <input id="btnConfirmNote" class="confirm-btn" type="submit" value="Confirm">
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<input type="hidden" id="hiddenOnAccount" value="@Model.ProductPrice"/>
+<input type="hidden" id="hidOnAccountValue" value="@Model.OnAccount" />
+<input type="hidden" id="hidRemCredit" value="@Model.RemainingCredit" />
+
+<script type="text/javascript">
+    $(document).ready(function () {
+        stickyHeader();
+    });</script>
